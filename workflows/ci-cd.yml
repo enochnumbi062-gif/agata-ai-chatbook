@@ -1,0 +1,30 @@
+name: CI/CD AgAtA-AI-CHATBOOK
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///test.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt pytest flake8 bandit
+      - run: flake8 main.py --count --select=E9,F63,F7,F82 --show-source --statistics
+      - run: bandit -q -r main.py -ll
+      - run: pytest -q tests/
+  deploy:
+    needs: test-and-scan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+    steps:
+      - name: Déclencher le déploiement Render
+        if: env.HOOK != ''
+        run: curl -fsS -X POST "$HOOK"
