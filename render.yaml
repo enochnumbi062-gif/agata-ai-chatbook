@@ -12,7 +12,7 @@ services:
         value: 3.11.9
       - key: ENVIRONMENT
         value: production
-      - key: DATABASE_URL
+      - key: DATABASE_URL   # URL Supabase (Session pooler, port 5432), saisie dans le tableau de bord Render
         sync: false
       - key: ENCRYPTION_MASTER_KEY
         generateValue: true
@@ -29,7 +29,18 @@ services:
           type: keyvalue
           name: agata-redis
           property: connectionString
+      - key: OAUTH_GITHUB_ID
+        sync: false
+      - key: OAUTH_GITHUB_SECRET
+        sync: false
+      - key: OAUTH_GOOGLE_ID
+        sync: false
+      - key: OAUTH_GOOGLE_SECRET
+        sync: false
+
   - type: keyvalue
     name: agata-redis
     region: frankfurt
     plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
