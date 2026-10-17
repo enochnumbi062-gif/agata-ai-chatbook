@@ -1,10 +1,12 @@
-fastapi>=0.115
-uvicorn[standard]>=0.30
-httpx>=0.27
-PyJWT>=2.9
-cryptography>=43
-SQLAlchemy>=2.0
-psycopg2-binary>=2.9
-pydantic>=2.7
-redis>=5.0
-webauthn>=2.2
+# Versions testées (Python 3.11 et 3.14, SQLite et PostgreSQL). Mettre à jour puis relancer « pytest ».
+fastapi==0.143.3
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.5
+alembic==1.20.0
+psycopg[binary]==3.3.6
+httpx==0.28.1
+pyjwt==2.15.1
+redis==8.1.0
+cryptography==50.0.2
+webauthn==3.0.1
+pydantic==2.14.1
