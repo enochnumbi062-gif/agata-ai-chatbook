@@ -4,22 +4,44 @@ services:
     runtime: python
     region: frankfurt
     plan: free
+    # Déploie seulement quand les tests GitHub Actions (ci-cd.yml) sont au vert.
+    autoDeployTrigger: checksPass
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # Les migrations Alembic sont appliquées à chaque démarrage (sans effet si la base est déjà à jour).
+    # (La « pre-deploy command » de Render n'existe que sur les offres payantes.)
+    startCommand: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT --no-server-header
     healthCheckPath: /healthz
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ENVIRONMENT
         value: production
-      - key: DATABASE_URL   # URL Supabase (Session pooler, port 5432), saisie dans le tableau de bord Render
+      - key: DATABASE_URL          # Supabase : « Session pooler » (port 5432), pas le « Transaction pooler » (6543)
         sync: false
-      - key: ENCRYPTION_MASTER_KEY
+      - key: ENCRYPTION_MASTER_KEY # ne JAMAIS la régénérer : les clés du coffre deviendraient illisibles
         generateValue: true
       - key: JWT_SECRET_KEY
         generateValue: true
-      - key: ADMIN_EMAIL
+      - key: TRUST_PROXY_HOPS      # Render ajoute l'IP réelle du client en fin de X-Forwarded-For
+        value: "1"
+      - key: AUTO_MIGRATE          # déjà fait par la startCommand
+        value: "0"
+      - key: ADMIN_EMAIL           # devient admin après confirmation de l'e-mail (lien ou Google/GitHub)
         sync: false
+      - key: FREE_CREDITS
+        value: "20"
+      - key: REQUIRE_VERIFIED_EMAIL
+        value: "1"
+      # --- E-mails : l'offre gratuite de Render bloque le SMTP → API HTTPS (Resend ou Brevo) ---
+      - key: MAIL_PROVIDER         # resend | brevo | smtp (offre payante uniquement) | console
+        value: brevo
+      - key: MAIL_FROM             # ex. « AgAtA <vous@votredomaine.com> » (expéditeur validé chez le fournisseur)
+        sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      # --- IA ---
       - key: MODERATOR_PROVIDER
         value: gemini
       - key: PLATFORM_GEMINI_KEY
@@ -29,6 +51,7 @@ services:
           type: keyvalue
           name: agata-redis
           property: connectionString
+      # --- Connexion Google / GitHub (facultatif) ---
       - key: OAUTH_GITHUB_ID
         sync: false
       - key: OAUTH_GITHUB_SECRET
@@ -42,5 +65,5 @@ services:
     name: agata-redis
     region: frankfurt
     plan: free
-    maxmemoryPolicy: allkeys-lru
-    ipAllowList: []
+    maxmemoryPolicy: volatile-lru   # n'évince que les clés avec expiration (limites, défis, révocations)
+    ipAllowList: []                 # accessible uniquement depuis le réseau privé Render
