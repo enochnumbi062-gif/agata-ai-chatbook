@@ -1,0 +1,55 @@
+name: CI/CD AgAtA-AI-CHATBOOK
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: development
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: agata_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -r requirements.txt pytest anyio flake8 bandit pip-audit
+      - name: Lint
+        run: flake8 main.py tests migrations --count --select=E9,F63,F7,F82,F401,F841 --show-source --statistics
+      - name: Sécurité (bandit)
+        run: bandit -q -r main.py -ll
+      - name: Dépendances vulnérables
+        run: pip-audit -r requirements.txt || true
+      - name: Migrations à jour avec les modèles (SQLite)
+        env:
+          DATABASE_URL: sqlite:///ci.db
+        run: alembic upgrade head && alembic check
+      - name: Tests (SQLite, avec migration d'un ancien schéma)
+        run: pytest -q -p anyio
+      - name: Tests (PostgreSQL)
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agata_test
+        run: pytest -q -p anyio
+  deploy:
+    needs: test-and-scan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    env:
+      HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+    steps:
+      - name: Déclencher le déploiement Render
+        if: env.HOOK != ''
+        run: curl -fsS -X POST "$HOOK"
